@@ -15,10 +15,10 @@ namespace IdentitySkillUp.Controllers
 {
     public class HomeController : Controller
     {
-        private readonly UserManager<IdentityUser> _userManager;
+        private readonly UserManager<PluralsightUser> _userManager;
 
 
-        public HomeController(UserManager<IdentityUser> userManager)
+        public HomeController(UserManager<PluralsightUser> userManager)
         {
             _userManager = userManager;
         }
@@ -56,7 +56,7 @@ namespace IdentitySkillUp.Controllers
 
                 if (user == null)
                 {
-                    user = new IdentityUser
+                    user = new PluralsightUser
                     {
                         Id = Guid.NewGuid().ToString(),
                         UserName = model.UserName

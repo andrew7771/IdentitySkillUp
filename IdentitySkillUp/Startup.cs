@@ -29,14 +29,14 @@ namespace IdentitySkillUp
         {
             services.AddControllersWithViews();
 
-            string connectionString = "Data Source=(localdb)\\MSSQLLocalDB;Initial Catalog=PluralsightDemo.IdentityUser;Integrated Security=True;Connect Timeout=30;Encrypt=False;TrustServerCertificate=False;ApplicationIntent=ReadWrite;MultiSubnetFailover=False";
+            string connectionString = "Data Source=(localdb)\\MSSQLLocalDB;Initial Catalog=PluralsightDemo.PluralsightUser;Integrated Security=True;Connect Timeout=30;Encrypt=False;TrustServerCertificate=False;ApplicationIntent=ReadWrite;MultiSubnetFailover=False";
             var migrationAssembly = typeof(Startup).GetTypeInfo().Assembly.GetName().Name; 
             
-            services.AddDbContext<IdentityDbContext>(opt => opt.UseSqlServer(connectionString,
+            services.AddDbContext<PluralsightUserDbContext>(opt => opt.UseSqlServer(connectionString,
                 sql => sql.MigrationsAssembly(migrationAssembly)));
 
-            services.AddIdentityCore<IdentityUser>(opt => { });
-            services.AddScoped<IUserStore<IdentityUser>, UserOnlyStore<IdentityUser, IdentityDbContext>>();
+            services.AddIdentityCore<PluralsightUser>(opt => { });
+            services.AddScoped<IUserStore<PluralsightUser>, UserOnlyStore<PluralsightUser, PluralsightUserDbContext>>();
             services.AddAuthentication("cookies")
                 .AddCookie("cookies", options => options.LoginPath = "/Home/Login");
         }
