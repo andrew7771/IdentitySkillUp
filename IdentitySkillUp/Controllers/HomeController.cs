@@ -191,7 +191,7 @@ namespace IdentitySkillUp.Controllers
                         {
                             ModelState.AddModelError("", error.Description);
                         }
-                        return View();
+                        return View(); 
                     }
 
                     if (await _userManager.IsLockedOutAsync(user))
