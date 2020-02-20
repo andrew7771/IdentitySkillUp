@@ -16,11 +16,16 @@ namespace IdentitySkillUp.Controllers
     public class HomeController : Controller
     {
         private readonly UserManager<PluralsightUser> _userManager;
+        private readonly IUserClaimsPrincipalFactory<PluralsightUser> _claimsPrincipalFactory;
+        private readonly SignInManager<PluralsightUser> _signInManager;
 
-
-        public HomeController(UserManager<PluralsightUser> userManager)
+        public HomeController(UserManager<PluralsightUser> userManager,
+            IUserClaimsPrincipalFactory<PluralsightUser> claimsPrincipalFactory,
+            SignInManager<PluralsightUser> signInManager)
         {
             _userManager = userManager;
+            _claimsPrincipalFactory = claimsPrincipalFactory;
+            _signInManager = signInManager;
         }
 
         public IActionResult Index()
@@ -93,16 +98,11 @@ namespace IdentitySkillUp.Controllers
             {
                 var user = await _userManager.FindByNameAsync(model.UserName);
 
-                if (user != null && await _userManager.CheckPasswordAsync(user, model.Password))
-                {
-                    var identity = new ClaimsIdentity("cookies");
-                    identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, user.Id));
-                    identity.AddClaim(new Claim(ClaimTypes.Name, user.UserName));
+                var signInResult = await _signInManager.PasswordSignInAsync(model.UserName, model.Password, false, false);
 
-                    await HttpContext.SignInAsync("cookies", new ClaimsPrincipal(identity));
-
+                if (signInResult.Succeeded)
                     return RedirectToAction("Index");
-                }
+
                 ModelState.AddModelError("", "Invalid UserName or Password");
             }
              

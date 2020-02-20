@@ -35,10 +35,12 @@ namespace IdentitySkillUp
             services.AddDbContext<PluralsightUserDbContext>(opt => opt.UseSqlServer(connectionString,
                 sql => sql.MigrationsAssembly(migrationAssembly)));
 
-            services.AddIdentityCore<PluralsightUser>(opt => { });
-            services.AddScoped<IUserStore<PluralsightUser>, UserOnlyStore<PluralsightUser, PluralsightUserDbContext>>();
-            services.AddAuthentication("cookies")
-                .AddCookie("cookies", options => options.LoginPath = "/Home/Login");
+            services.AddIdentity<PluralsightUser, IdentityRole>(opt => { })
+                .AddEntityFrameworkStores<PluralsightUserDbContext>();
+            services.AddScoped<IUserClaimsPrincipalFactory<PluralsightUser>, PluralsightUserClaimsPrinpicalFactory>();
+
+
+            services.ConfigureApplicationCookie(opt => opt.LoginPath = "/Home/Login");
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
