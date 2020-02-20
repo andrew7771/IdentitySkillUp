@@ -76,11 +76,18 @@ namespace IdentitySkillUp.Controllers
                         var confirmationEmail = Url.Action("ConfirmEmailAddress", "Home",
                             new { token = token, email = user.Email }, Request.Scheme);
                         System.IO.File.WriteAllText("confirmationLink.txt", confirmationEmail);
-
+                        
+                        return View("Success");
                     }
+                    else
+                    {
+                        foreach (var error in result.Errors)
+                        {
+                            ModelState.AddModelError("", error.Description);
+                        }
+                    }
+                    
                 }
-
-                return View("Success");
             }
 
             return View();

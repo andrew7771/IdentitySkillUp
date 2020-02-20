@@ -35,22 +35,28 @@ namespace IdentitySkillUp
             services.AddDbContext<PluralsightUserDbContext>(opt => opt.UseSqlServer(connectionString,
                 sql => sql.MigrationsAssembly(migrationAssembly)));
 
-            services.AddIdentity<PluralsightUser, IdentityRole>(opt => 
+            services.AddIdentity<PluralsightUser, IdentityRole>(opt =>
                 {
                     //opt.SignIn.RequireConfirmedEmail = true;
                     opt.Tokens.EmailConfirmationTokenProvider = "emailconf";
+
+                    opt.Password.RequireNonAlphanumeric = false;
+                    opt.Password.RequiredUniqueChars = 4;
+
+                    opt.User.RequireUniqueEmail = true;
                 })
                 .AddEntityFrameworkStores<PluralsightUserDbContext>()
                 .AddDefaultTokenProviders()
-                .AddTokenProvider<EmailConfirmationTokenProvider<PluralsightUser>>("emailconf");
+                .AddTokenProvider<EmailConfirmationTokenProvider<PluralsightUser>>("emailconf")
+                .AddPasswordValidator<DoesNotContainPasswordValidator<PluralsightUser>>();
+
+            services.AddScoped<IUserClaimsPrincipalFactory<PluralsightUser>,
+               PluralsightUserClaimsPrinpicalFactory>();
 
             services.Configure<DataProtectionTokenProviderOptions>(opt =>
                 opt.TokenLifespan = TimeSpan.FromHours(3));
             services.Configure<EmailConfirmationTokenProviderOptions>(opt =>
                opt.TokenLifespan = TimeSpan.FromDays(2));
-
-            services.AddScoped<IUserClaimsPrincipalFactory<PluralsightUser>, PluralsightUserClaimsPrinpicalFactory>();
-
 
             services.ConfigureApplicationCookie(opt => opt.LoginPath = "/Home/Login");
         }
