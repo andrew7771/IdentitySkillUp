@@ -123,6 +123,15 @@ namespace IdentitySkillUp.Controllers
                         {
                             var validProviders = await _userManager.GetValidTwoFactorProvidersAsync(user);
                              
+                            //should use device authenticator to proceed with this
+
+                            //if (validProviders.Contains(_userManager.Options.Tokens.AuthenticatorTokenProvider))
+                            //{
+                            //    await HttpContext.SignInAsync(IdentityConstants.TwoFactorUserIdScheme,
+                            //        Store2FA(user.Id, _userManager.Options.Tokens.AuthenticatorTokenProvider));
+                            //    return RedirectToAction("TwoFactor");
+                            //}
+
                             if (validProviders.Contains("Email"))
                             {
 
@@ -297,6 +306,98 @@ namespace IdentitySkillUp.Controllers
             }, IdentityConstants.TwoFactorUserIdScheme);
 
             return new ClaimsPrincipal(identity);
+        }
+
+        [HttpGet]
+        [Authorize]
+        public async Task<IActionResult> RegisterAuthenticator()
+        {
+            var user = await _userManager.GetUserAsync(User);
+
+            var authenticatorKey = await _userManager.GetAuthenticatorKeyAsync(user);
+
+            if (authenticatorKey == null)
+            {
+                await _userManager.ResetAuthenticatorKeyAsync(user);
+                authenticatorKey = await _userManager.GetAuthenticatorKeyAsync(user);
+
+            }
+
+            return View(new RegisterAuthenticatorModel { AuthenticatorKey = authenticatorKey });
+        }
+
+        [HttpPost]
+        [Authorize]
+        public async Task<IActionResult> RegisterAuthenticator(RegisterAuthenticatorModel model)
+        {
+            var user = await _userManager.GetUserAsync(User);
+
+            var isValid = await _userManager.VerifyTwoFactorTokenAsync(user,
+                _userManager.Options.Tokens.AuthenticatorTokenProvider, model.Code);
+
+            if (!isValid)
+            {
+                ModelState.AddModelError("", "Code is invalid");
+                return View(model);
+            }
+
+            await _userManager.SetTwoFactorEnabledAsync(user, true);
+            return View("Success");
+        }
+
+        [HttpGet]
+        public IActionResult ExternalLogin(string provider)
+        {
+            var properties = new AuthenticationProperties
+            {
+                RedirectUri = Url.Action("ExternalLoginCallBack"),
+                Items = { { "scheme", provider } }
+            };
+
+            return Challenge(properties, provider);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ExternalLoginCallBack()
+        {
+            var result = await HttpContext.AuthenticateAsync(IdentityConstants.ExternalScheme);
+
+            var externalUserId = result.Principal.FindFirstValue("sub")
+                                 ?? result.Principal.FindFirstValue(ClaimTypes.NameIdentifier)
+                                 ?? throw new Exception("Cannot find external user id");
+
+            var provider = result.Properties.Items["scheme"];
+
+            var user = await _userManager.FindByLoginAsync(provider, externalUserId);
+
+            if (user == null)
+            {
+                var email = result.Principal.FindFirstValue("email")
+                            ?? result.Principal.FindFirstValue(ClaimTypes.Email);
+                if (email != null)
+                {
+                    user = await _userManager.FindByEmailAsync(email);
+
+                    if (user == null)
+                    {
+                        user = new PluralsightUser { UserName = email, Email = email };
+                        await _userManager.CreateAsync(user);
+                    }
+
+                    await _userManager.AddLoginAsync(user,
+                        new UserLoginInfo(provider, externalUserId, provider));
+                }
+            }
+
+            if (user == null)
+                return View("Error");
+
+            await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+
+            var claimsPrincipal = await _claimsPrincipalFactory.CreateAsync(user);
+            await HttpContext.SignInAsync(IdentityConstants.ApplicationScheme, claimsPrincipal);
+
+            return RedirectToAction("Index");
         }
     }
 }
