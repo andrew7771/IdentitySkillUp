@@ -51,7 +51,7 @@ namespace IdentitySkillUp
                 })
                 .AddEntityFrameworkStores<PluralsightUserDbContext>()
                 .AddDefaultTokenProviders()
-                .AddTokenProvider<EmailConfirmationTokenProvider<PluralsightUser>>("emailconf")
+                .AddTokenProvider<EmailConfirmationTokenProvider<PluralsightUser>>("emailconf")                
                 .AddPasswordValidator<DoesNotContainPasswordValidator<PluralsightUser>>();
 
             services.AddScoped<IUserClaimsPrincipalFactory<PluralsightUser>,
@@ -63,6 +63,13 @@ namespace IdentitySkillUp
                opt.TokenLifespan = TimeSpan.FromDays(2));
 
             services.ConfigureApplicationCookie(opt => opt.LoginPath = "/Home/Login");
+
+            services.AddAuthentication().AddGoogle("google", opt =>
+            {
+                opt.ClientId = "xxx";
+                opt.ClientSecret = "xxx";
+                opt.SignInScheme = IdentityConstants.ExternalScheme;
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

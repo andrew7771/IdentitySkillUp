@@ -111,14 +111,42 @@ namespace IdentitySkillUp.Controllers
                 {
                     if (await _userManager.CheckPasswordAsync(user, model.Password))
                     {
-                        if (!await _userManager.IsEmailConfirmedAsync(user))
+                        //if (!await _userManager.IsEmailConfirmedAsync(user))
+                        //{
+                        //    ModelState.AddModelError("", "Email is not confirmed");
+                        //    return View();
+                        //}
+
+                        await _userManager.ResetAccessFailedCountAsync(user);
+
+                        if (await _userManager.GetTwoFactorEnabledAsync(user))
                         {
-                            ModelState.AddModelError("", "Email is not confirmed");
-                            return View();
+                            var validProviders = await _userManager.GetValidTwoFactorProvidersAsync(user);
+                             
+                            //should use device authenticator to proceed with this
+
+                            //if (validProviders.Contains(_userManager.Options.Tokens.AuthenticatorTokenProvider))
+                            //{
+                            //    await HttpContext.SignInAsync(IdentityConstants.TwoFactorUserIdScheme,
+                            //        Store2FA(user.Id, _userManager.Options.Tokens.AuthenticatorTokenProvider));
+                            //    return RedirectToAction("TwoFactor");
+                            //}
+
+                            if (validProviders.Contains("Email"))
+                            {
+
+                                var token = await _userManager.GenerateTwoFactorTokenAsync(user, "Email");
+                                System.IO.File.WriteAllText("email2sv.txt", token);
+
+
+                                await HttpContext.SignInAsync(IdentityConstants.TwoFactorUserIdScheme,
+                                    Store2FA(user.Id, "Email"));
+
+                                return RedirectToAction("TwoFactor");
+                            }
                         }
 
                         var principal = await _claimsPrincipalFactory.CreateAsync(user);
-
                         await HttpContext.SignInAsync("Identity.Application", principal);
 
                         return RedirectToAction("Index");
@@ -221,6 +249,155 @@ namespace IdentitySkillUp.Controllers
             }
 
             return View("Error");
+        }
+
+        [HttpGet]
+        public IActionResult TwoFactor()
+        {
+            return View();
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> TwoFactor(TwoFactorModel model)
+        {
+            var result = await HttpContext.AuthenticateAsync(IdentityConstants.TwoFactorUserIdScheme);
+            if (!result.Succeeded)
+            {
+                ModelState.AddModelError("", "Your login request has expired, please start over");
+                return View();
+            }
+
+            if (ModelState.IsValid)
+            {
+                var user = await _userManager.FindByIdAsync(result.Principal.FindFirstValue("sub"));
+
+                if (user != null)
+                {
+                    var isvalid = await _userManager.VerifyTwoFactorTokenAsync(user,
+                        result.Principal.FindFirstValue("amr"), model.Token);
+
+                    if (isvalid)
+                    {
+                        await HttpContext.SignOutAsync(IdentityConstants.TwoFactorUserIdScheme);
+
+                        var claimsPrincipal = await _claimsPrincipalFactory.CreateAsync(user);
+                        await HttpContext.SignInAsync(IdentityConstants.ApplicationScheme, claimsPrincipal);
+
+                        return RedirectToAction("Index");
+                    }
+
+                    ModelState.AddModelError("", "Invalid Token");
+                    return View();
+                }
+
+                ModelState.AddModelError("", "Invalid request");
+            }
+
+            return View();
+
+        }
+
+        private ClaimsPrincipal Store2FA(string userId, string provider)
+        {
+            var identity = new ClaimsIdentity(new List<Claim>
+            {
+                new Claim("sub", userId),
+                new Claim("amr", provider)
+            }, IdentityConstants.TwoFactorUserIdScheme);
+
+            return new ClaimsPrincipal(identity);
+        }
+
+        [HttpGet]
+        [Authorize]
+        public async Task<IActionResult> RegisterAuthenticator()
+        {
+            var user = await _userManager.GetUserAsync(User);
+
+            var authenticatorKey = await _userManager.GetAuthenticatorKeyAsync(user);
+
+            if (authenticatorKey == null)
+            {
+                await _userManager.ResetAuthenticatorKeyAsync(user);
+                authenticatorKey = await _userManager.GetAuthenticatorKeyAsync(user);
+
+            }
+
+            return View(new RegisterAuthenticatorModel { AuthenticatorKey = authenticatorKey });
+        }
+
+        [HttpPost]
+        [Authorize]
+        public async Task<IActionResult> RegisterAuthenticator(RegisterAuthenticatorModel model)
+        {
+            var user = await _userManager.GetUserAsync(User);
+
+            var isValid = await _userManager.VerifyTwoFactorTokenAsync(user,
+                _userManager.Options.Tokens.AuthenticatorTokenProvider, model.Code);
+
+            if (!isValid)
+            {
+                ModelState.AddModelError("", "Code is invalid");
+                return View(model);
+            }
+
+            await _userManager.SetTwoFactorEnabledAsync(user, true);
+            return View("Success");
+        }
+
+        [HttpGet]
+        public IActionResult ExternalLogin(string provider)
+        {
+            var properties = new AuthenticationProperties
+            {
+                RedirectUri = Url.Action("ExternalLoginCallBack"),
+                Items = { { "scheme", provider } }
+            };
+
+            return Challenge(properties, provider);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ExternalLoginCallBack()
+        {
+            var result = await HttpContext.AuthenticateAsync(IdentityConstants.ExternalScheme);
+
+            var externalUserId = result.Principal.FindFirstValue("sub")
+                                 ?? result.Principal.FindFirstValue(ClaimTypes.NameIdentifier)
+                                 ?? throw new Exception("Cannot find external user id");
+
+            var provider = result.Properties.Items["scheme"];
+
+            var user = await _userManager.FindByLoginAsync(provider, externalUserId);
+
+            if (user == null)
+            {
+                var email = result.Principal.FindFirstValue("email")
+                            ?? result.Principal.FindFirstValue(ClaimTypes.Email);
+                if (email != null)
+                {
+                    user = await _userManager.FindByEmailAsync(email);
+
+                    if (user == null)
+                    {
+                        user = new PluralsightUser { UserName = email, Email = email };
+                        await _userManager.CreateAsync(user);
+                    }
+
+                    await _userManager.AddLoginAsync(user,
+                        new UserLoginInfo(provider, externalUserId, provider));
+                }
+            }
+
+            if (user == null)
+                return View("Error");
+
+            await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+
+            var claimsPrincipal = await _claimsPrincipalFactory.CreateAsync(user);
+            await HttpContext.SignInAsync(IdentityConstants.ApplicationScheme, claimsPrincipal);
+
+            return RedirectToAction("Index");
         }
     }
 }
