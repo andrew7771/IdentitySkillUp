@@ -13,14 +13,13 @@ namespace IdentitySkillUp
         {
             var userName = await manager.GetUserNameAsync(user);
 
-            return IdentityResult.Failed(new IdentityError { Description = "Password cannot contain username" });
 
-            //if (userName == password)
-            //    return IdentityResult.Failed(new IdentityError { Description = "Password cannot contain username" });
-            //if (password.Contains("password"))
-            //    return IdentityResult.Failed(new IdentityError { Description = "Password cannot contain password" });
+            if (userName == password)
+                return IdentityResult.Failed(new IdentityError { Description = "Password cannot contain username" });
+            if (password.Contains("password"))
+                return IdentityResult.Failed(new IdentityError { Description = "Password cannot contain password" });
 
-            //return IdentityResult.Success;
+            return IdentityResult.Success;
         }
     }
 }
