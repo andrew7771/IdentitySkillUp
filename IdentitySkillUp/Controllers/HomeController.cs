@@ -193,6 +193,11 @@ namespace IdentitySkillUp.Controllers
                         }
                         return View();
                     }
+
+                    if (await _userManager.IsLockedOutAsync(user))
+                    {
+                        await _userManager.SetLockoutEndDateAsync(user, DateTimeOffset.UtcNow);
+                    }
                     return View("Success");
                 }
                 ModelState.AddModelError("", "Invalid Request");
