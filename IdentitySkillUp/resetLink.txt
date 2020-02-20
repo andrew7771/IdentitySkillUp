@@ -1,0 +1,1 @@
+http://localhost:60550/Home/ResetPassword?token=CfDJ8EV5P%2Fk6OhlFv5zBQsZbKP23vitI0yhvZ4pQiusDG%2FT4iQa%2B%2Fq2sBGZlJDE%2F7a%2FksqzhEAk8Lik%2B4mMgXgfk%2BQPUDCrEFDUJeb%2BRguPPDU5rjfEA2VKtjhAVl0CH74K482dNvhZqDj0BX8JpIuFRpBQe03aRYAkdfwIoWE4Mt8H%2BCuuNl1aA4o26ODKqIIUIe6sDqsMFRquUdV7gHz7dNP4rQJ1o89QHj%2BkxbrsFuX8l&email=aturyansky33@gmail.com

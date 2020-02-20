@@ -16,11 +16,16 @@ namespace IdentitySkillUp.Controllers
     public class HomeController : Controller
     {
         private readonly UserManager<PluralsightUser> _userManager;
+        private readonly IUserClaimsPrincipalFactory<PluralsightUser> _claimsPrincipalFactory;
+        private readonly SignInManager<PluralsightUser> _signInManager;
 
-
-        public HomeController(UserManager<PluralsightUser> userManager)
+        public HomeController(UserManager<PluralsightUser> userManager,
+            IUserClaimsPrincipalFactory<PluralsightUser> claimsPrincipalFactory,
+            SignInManager<PluralsightUser> signInManager)
         {
             _userManager = userManager;
+            _claimsPrincipalFactory = claimsPrincipalFactory;
+            _signInManager = signInManager;
         }
 
         public IActionResult Index()
@@ -59,21 +64,30 @@ namespace IdentitySkillUp.Controllers
                     user = new PluralsightUser
                     {
                         Id = Guid.NewGuid().ToString(),
-                        UserName = model.UserName
+                        UserName = model.UserName,
+                        Email = model.UserName
                     };
 
                     var result = await _userManager.CreateAsync(user, model.Password);
-                    if (result.Errors.Any())
+
+                    if (result.Succeeded)
+                    {
+                        var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+                        var confirmationEmail = Url.Action("ConfirmEmailAddress", "Home",
+                            new { token = token, email = user.Email }, Request.Scheme);
+                        System.IO.File.WriteAllText("confirmationLink.txt", confirmationEmail);
+                        
+                        return View("Success");
+                    }
+                    else
                     {
                         foreach (var error in result.Errors)
                         {
-                            ModelState.AddModelError(error.Code, error.Description);
+                            ModelState.AddModelError("", error.Description);
                         }
-                        return View();
                     }
+                    
                 }
-
-                return View("Success");
             }
 
             return View();
@@ -93,20 +107,120 @@ namespace IdentitySkillUp.Controllers
             {
                 var user = await _userManager.FindByNameAsync(model.UserName);
 
-                if (user != null && await _userManager.CheckPasswordAsync(user, model.Password))
+                if (user != null && !await _userManager.IsLockedOutAsync(user))
                 {
-                    var identity = new ClaimsIdentity("cookies");
-                    identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, user.Id));
-                    identity.AddClaim(new Claim(ClaimTypes.Name, user.UserName));
+                    if (await _userManager.CheckPasswordAsync(user, model.Password))
+                    {
+                        if (!await _userManager.IsEmailConfirmedAsync(user))
+                        {
+                            ModelState.AddModelError("", "Email is not confirmed");
+                            return View();
+                        }
 
-                    await HttpContext.SignInAsync("cookies", new ClaimsPrincipal(identity));
+                        var principal = await _claimsPrincipalFactory.CreateAsync(user);
 
-                    return RedirectToAction("Index");
+                        await HttpContext.SignInAsync("Identity.Application", principal);
+
+                        return RedirectToAction("Index");
+                    }
+
+                    await _userManager.AccessFailedAsync(user);
+
+                    if (await _userManager.IsLockedOutAsync(user))
+                    {
+                        // email user, notifying them of lockout
+                    }
                 }
-                ModelState.AddModelError("", "Invalid UserName or Password");
+                
             }
              
             return View();
+        }
+
+        [HttpGet]
+        public  IActionResult ForgotPassword()
+        {
+            return View();
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ForgotPassword(ForgotPasswordModel model)
+        {
+            if (ModelState.IsValid)
+            {
+                var user = await _userManager.FindByEmailAsync(model.Email);
+
+                if (user != null)
+                {
+                    var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+
+                    var resetUrl = Url.Action("ResetPassword", "Home",
+                        new { token = token, email = user.Email }, Request.Scheme);
+
+                    System.IO.File.WriteAllText("resetLink.txt", resetUrl);
+                }
+                {
+                    //email user and inform that they do not have an account
+                }
+
+                return View("Success");
+            }
+            return View();
+        }
+
+        [HttpGet]
+        public IActionResult ResetPassword(string token, string email)
+        {
+            return View(new ResetPasswordModel { Token = token, Email = email });
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ResetPassword(ResetPasswordModel model)
+        {
+            if (ModelState.IsValid)
+            {
+                var user = await _userManager.FindByEmailAsync(model.Email);
+
+                if (user != null)
+                {
+                    var result = await _userManager.ResetPasswordAsync(user, model.Token, model.Password);
+
+                    if (!result.Succeeded)
+                    {
+                        foreach (var error in result.Errors)
+                        {
+                            ModelState.AddModelError("", error.Description);
+                        }
+                        return View();
+                    }
+
+                    if (await _userManager.IsLockedOutAsync(user))
+                    {
+                        await _userManager.SetLockoutEndDateAsync(user, DateTimeOffset.UtcNow);
+                    }
+                    return View("Success");
+                }
+                ModelState.AddModelError("", "Invalid Request");
+            }
+            return View();
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ConfirmEmailAddress(string token, string email)
+        {
+            var user = await _userManager.FindByEmailAsync(email);
+
+            if (user != null)
+            {
+                var result = await _userManager.ConfirmEmailAsync(user, token);
+
+                if (result.Succeeded)
+                {
+                    return View("Success");
+                }
+            }
+
+            return View("Error");
         }
     }
 }

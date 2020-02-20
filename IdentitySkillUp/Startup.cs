@@ -35,10 +35,34 @@ namespace IdentitySkillUp
             services.AddDbContext<PluralsightUserDbContext>(opt => opt.UseSqlServer(connectionString,
                 sql => sql.MigrationsAssembly(migrationAssembly)));
 
-            services.AddIdentityCore<PluralsightUser>(opt => { });
-            services.AddScoped<IUserStore<PluralsightUser>, UserOnlyStore<PluralsightUser, PluralsightUserDbContext>>();
-            services.AddAuthentication("cookies")
-                .AddCookie("cookies", options => options.LoginPath = "/Home/Login");
+            services.AddIdentity<PluralsightUser, IdentityRole>(opt =>
+                {
+                    //opt.SignIn.RequireConfirmedEmail = true;
+                    opt.Tokens.EmailConfirmationTokenProvider = "emailconf";
+
+                    opt.Password.RequireNonAlphanumeric = false;
+                    opt.Password.RequiredUniqueChars = 4;
+
+                    opt.User.RequireUniqueEmail = true;
+
+                    opt.Lockout.AllowedForNewUsers = true;
+                    opt.Lockout.MaxFailedAccessAttempts = 3;
+                    opt.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(10);
+                })
+                .AddEntityFrameworkStores<PluralsightUserDbContext>()
+                .AddDefaultTokenProviders()
+                .AddTokenProvider<EmailConfirmationTokenProvider<PluralsightUser>>("emailconf")
+                .AddPasswordValidator<DoesNotContainPasswordValidator<PluralsightUser>>();
+
+            services.AddScoped<IUserClaimsPrincipalFactory<PluralsightUser>,
+               PluralsightUserClaimsPrinpicalFactory>();
+
+            services.Configure<DataProtectionTokenProviderOptions>(opt =>
+                opt.TokenLifespan = TimeSpan.FromHours(3));
+            services.Configure<EmailConfirmationTokenProviderOptions>(opt =>
+               opt.TokenLifespan = TimeSpan.FromDays(2));
+
+            services.ConfigureApplicationCookie(opt => opt.LoginPath = "/Home/Login");
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
