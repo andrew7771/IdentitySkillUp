@@ -44,6 +44,10 @@ namespace IdentitySkillUp
                     opt.Password.RequiredUniqueChars = 4;
 
                     opt.User.RequireUniqueEmail = true;
+
+                    opt.Lockout.AllowedForNewUsers = true;
+                    opt.Lockout.MaxFailedAccessAttempts = 3;
+                    opt.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(10);
                 })
                 .AddEntityFrameworkStores<PluralsightUserDbContext>()
                 .AddDefaultTokenProviders()

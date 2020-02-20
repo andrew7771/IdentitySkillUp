@@ -107,19 +107,29 @@ namespace IdentitySkillUp.Controllers
             {
                 var user = await _userManager.FindByNameAsync(model.UserName);
 
-                if (user != null && await _userManager.CheckPasswordAsync(user, model.Password))
+                if (user != null && !await _userManager.IsLockedOutAsync(user))
                 {
-                    if (!await _userManager.IsEmailConfirmedAsync(user))
+                    if (await _userManager.CheckPasswordAsync(user, model.Password))
                     {
-                        ModelState.AddModelError("", "Email is not confirmed");
-                        return View();
+                        if (!await _userManager.IsEmailConfirmedAsync(user))
+                        {
+                            ModelState.AddModelError("", "Email is not confirmed");
+                            return View();
+                        }
+
+                        var principal = await _claimsPrincipalFactory.CreateAsync(user);
+
+                        await HttpContext.SignInAsync("Identity.Application", principal);
+
+                        return RedirectToAction("Index");
                     }
 
-                    var principal = await _claimsPrincipalFactory.CreateAsync(user);
+                    await _userManager.AccessFailedAsync(user);
 
-                    await HttpContext.SignInAsync("Identity.Application", principal);
-
-                    return RedirectToAction("Index");
+                    if (await _userManager.IsLockedOutAsync(user))
+                    {
+                        // email user, notifying them of lockout
+                    }
                 }
                 
             }
