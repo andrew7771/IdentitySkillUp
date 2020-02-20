@@ -35,12 +35,19 @@ namespace IdentitySkillUp
             services.AddDbContext<PluralsightUserDbContext>(opt => opt.UseSqlServer(connectionString,
                 sql => sql.MigrationsAssembly(migrationAssembly)));
 
-            services.AddIdentity<PluralsightUser, IdentityRole>(opt => { })
+            services.AddIdentity<PluralsightUser, IdentityRole>(opt => 
+                {
+                    //opt.SignIn.RequireConfirmedEmail = true;
+                    opt.Tokens.EmailConfirmationTokenProvider = "emailconf";
+                })
                 .AddEntityFrameworkStores<PluralsightUserDbContext>()
-                .AddDefaultTokenProviders();
+                .AddDefaultTokenProviders()
+                .AddTokenProvider<EmailConfirmationTokenProvider<PluralsightUser>>("emailconf");
 
             services.Configure<DataProtectionTokenProviderOptions>(opt =>
                 opt.TokenLifespan = TimeSpan.FromHours(3));
+            services.Configure<EmailConfirmationTokenProviderOptions>(opt =>
+               opt.TokenLifespan = TimeSpan.FromDays(2));
 
             services.AddScoped<IUserClaimsPrincipalFactory<PluralsightUser>, PluralsightUserClaimsPrinpicalFactory>();
 

@@ -64,17 +64,19 @@ namespace IdentitySkillUp.Controllers
                     user = new PluralsightUser
                     {
                         Id = Guid.NewGuid().ToString(),
-                        UserName = model.UserName
+                        UserName = model.UserName,
+                        Email = model.UserName
                     };
 
                     var result = await _userManager.CreateAsync(user, model.Password);
-                    if (result.Errors.Any())
+
+                    if (result.Succeeded)
                     {
-                        foreach (var error in result.Errors)
-                        {
-                            ModelState.AddModelError(error.Code, error.Description);
-                        }
-                        return View();
+                        var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+                        var confirmationEmail = Url.Action("ConfirmEmailAddress", "Home",
+                            new { token = token, email = user.Email }, Request.Scheme);
+                        System.IO.File.WriteAllText("confirmationLink.txt", confirmationEmail);
+
                     }
                 }
 
@@ -98,12 +100,21 @@ namespace IdentitySkillUp.Controllers
             {
                 var user = await _userManager.FindByNameAsync(model.UserName);
 
-                var signInResult = await _signInManager.PasswordSignInAsync(model.UserName, model.Password, false, false);
+                if (user != null && await _userManager.CheckPasswordAsync(user, model.Password))
+                {
+                    if (!await _userManager.IsEmailConfirmedAsync(user))
+                    {
+                        ModelState.AddModelError("", "Email is not confirmed");
+                        return View();
+                    }
 
-                if (signInResult.Succeeded)
+                    var principal = await _claimsPrincipalFactory.CreateAsync(user);
+
+                    await HttpContext.SignInAsync("Identity.Application", principal);
+
                     return RedirectToAction("Index");
-
-                ModelState.AddModelError("", "Invalid UserName or Password");
+                }
+                
             }
              
             return View();
@@ -170,6 +181,24 @@ namespace IdentitySkillUp.Controllers
                 ModelState.AddModelError("", "Invalid Request");
             }
             return View();
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ConfirmEmailAddress(string token, string email)
+        {
+            var user = await _userManager.FindByEmailAsync(email);
+
+            if (user != null)
+            {
+                var result = await _userManager.ConfirmEmailAsync(user, token);
+
+                if (result.Succeeded)
+                {
+                    return View("Success");
+                }
+            }
+
+            return View("Error");
         }
     }
 }
