@@ -36,7 +36,12 @@ namespace IdentitySkillUp
                 sql => sql.MigrationsAssembly(migrationAssembly)));
 
             services.AddIdentity<PluralsightUser, IdentityRole>(opt => { })
-                .AddEntityFrameworkStores<PluralsightUserDbContext>();
+                .AddEntityFrameworkStores<PluralsightUserDbContext>()
+                .AddDefaultTokenProviders();
+
+            services.Configure<DataProtectionTokenProviderOptions>(opt =>
+                opt.TokenLifespan = TimeSpan.FromHours(3));
+
             services.AddScoped<IUserClaimsPrincipalFactory<PluralsightUser>, PluralsightUserClaimsPrinpicalFactory>();
 
 
