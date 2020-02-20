@@ -51,7 +51,7 @@ namespace IdentitySkillUp
                 })
                 .AddEntityFrameworkStores<PluralsightUserDbContext>()
                 .AddDefaultTokenProviders()
-                .AddTokenProvider<EmailConfirmationTokenProvider<PluralsightUser>>("emailconf")
+                .AddTokenProvider<EmailConfirmationTokenProvider<PluralsightUser>>("emailconf")                
                 .AddPasswordValidator<DoesNotContainPasswordValidator<PluralsightUser>>();
 
             services.AddScoped<IUserClaimsPrincipalFactory<PluralsightUser>,
